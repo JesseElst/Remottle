@@ -11,6 +11,7 @@
  * MQTTClient.h is found in the library manager (MQTT by Joel
  *
  **************************************/
+
 #include <SPI.h>
 #include <WiFi101.h>
 #include <MQTTClient.h>
@@ -19,16 +20,8 @@
 
 LSM6 imu;
 
-// constants won't change. They're used here to
-// set pin numbers:
-
 int water;
 int laatsteslok;
-// variables will change:
-// variable for reading the pushbutton status
-int lastStateRed = 0;
-int lastStateOrange = 0;
-int lastStateBlue = 0;
 
 //Wifi data
 char *ssid ="12connect";
@@ -36,10 +29,10 @@ WiFiClient net;
 MQTTClient mqtt;
 
 
-// This is the client Id that will be used, the mac will be append!
+// Gegevens client
 String mqttClientId = "mkr-";
-// This is the start of the topic that will be used. ClientID and button will be append
 String buttonTopic = "public/i363602_water/";
+
 
 void setup() {
   Serial.begin(9600);
@@ -51,65 +44,55 @@ void setup() {
     while (1);
   }
   imu.enableDefault();
-  // initialize the LED pin as an output:
-
-  // Try to start and wait for serial connection (or timeout after 5 seconds)
-  // Debug serial SET to 115200!!
   while ((!Serial) && (millis() < 5000));
   Serial.begin(115200);
 
-  // Init WiFi
+  // maak verbinding met netwerk
   WiFi.begin(ssid);
 
-  // Init MQTT with correct server (this is no connect!)
+  // maak verbinding met mqtt
   mqtt.begin("mqtt.fhict.nl", net);
-
-  // Get the mac and setup the ClientID and topic
-  uint8_t mac[6];
-  WiFi.macAddress(mac);
-  mqttClientId += macToStr(mac);
-  Serial.println("Client ID: " + mqttClientId);
-  buttonTopic += mqttClientId + "/button";
-  Serial.println("Publish topic: " + buttonTopic);
 
   connect();
 }
 
+
 void loop() {
   imu.read();
+    //als fles schuin staat
 if(imu.a.z <= 6000)
-{ delay(100);
+{  //elke 0.1 seconden
+    delay(100);
+    //tel 3 mililiter bij
   water = water + 3;
- 
-  
 }
+    
+//als de fles op de grond staat
 else
 {  
+  //als je net hebt gedronken
   if(laatsteslok != water)
   {
+   //wacht een seconden
    delay(1000);
+   //stuur aantal mililiter
    sendtilt(water); 
+   // maak water weer normaal
    laatsteslok = water;
    
   }
 }
-
-
-
-
-
-
 }
 
 
 
 void sendtilt(int value){
- 
+ //kijk of hij verbinding heeft met mqtt
   if(!mqtt.connected()) {
     connect();
   }
 
-  
+//verstuur bericht naar mqtt broker  
   mqtt.publish("public/i363602_water/tilt/", String(value) );
   Serial.print("Je hebt nu ");
 Serial.print(water);
@@ -119,7 +102,7 @@ Serial.print(water);
 
 
 
-// Call to connect to the MQTT server
+// maak verbinding met wifi
 void connect() {
   Serial.print("checking wifi...");
   while (WiFi.status() != WL_CONNECTED) {
@@ -134,24 +117,5 @@ void connect() {
   }
 
   Serial.println("\nconnected!");
-}
-
-// Convert the MAC to a string
-String macToStr(const uint8_t* mac)
-{
-  String result;
-  for (int i = 0; i < 6; ++i) {
-    result += String(mac[i], 16);
-  }
-  return result;
-}
-
-// This is not used, but this way you can receive messages.
-void messageReceived(String topic, String payload, char * bytes, unsigned int length) {
-  Serial.print("incoming: ");
-  Serial.print(topic);
-  Serial.print(" - ");
-  Serial.print(payload);
-  Serial.println();
 }
 
